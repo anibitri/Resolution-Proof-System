@@ -1,174 +1,69 @@
-#Binary connectives
+% Binary connectives
 neg(X) :- \+ X.
-X and Y :- X, Y.
-X or Y :- X; Y.
-X imp Y :- neg(X); Y.
-X revimp Y:- X; neg(Y).
-X uparrow Y :- neg(X and Y).
-X downarrow Y :- neg(X or Y).
-X notimp Y :- neg(X imp Y).
-X notrevimp Y:- neg(X revimp Y).
+and(X,Y) :- X, Y.
+or(X,Y) :- X; Y.
+imp(X,Y) :- \+ X; Y.
+revimp(X,Y) :- X; \+ Y.
+uparrow(X,Y) :- \+ and(X,Y).
+downarrow(X,Y) :- \+ or(X,Y).
+notimp(X,Y) :- \+ imp(X,Y).
+notrevimp(X,Y) :- \+ revimp(X,Y).
 
-# Equivalence connectives
-X equiv Y :- X imp Y, Y imp X.
-X notequiv Y :- neg(X equiv Y).
+% Equivalence connectives
+equiv(X,Y) :- X=Y.
+notequiv(X,Y) :- \+ equiv(X,Y).
 
-/** member(Item, List) :- Item occurs in List
-*/
+% Conjunctive and disjunctive connectives
+conjunctive(and(_, _)).
+conjunctive(neg(or(_, _))).
+conjunctive(neg(imp(_, _))).
+conjunctive(neg(revimp(_, _))).
+conjunctive(neg(uparrow(_, _))).
+conjunctive(downarrow(_, _)).
+conjunctive(notimp(_, _)).
+conjunctive(notrevimp(_, _)).
 
-member(X, [X | _]).
-member(X, [_ | Tail]) :- member(X, Tail).
+disjunctive(neg(and(_, _))).
+disjunctive(or(_, _)).
+disjunctive(imp(_, _)).
+disjunction(revimp(_, _)).
+disjunctive(uparrow(_, _)).
+disjunctive(neg(downarrow(_, _))).
+disjunctive(neg(notimp(_, _))).
+disjunctive(neg(notrevimp(_, _))).
 
-/** remove(Item, List, Newlist) :- Newlist is the result of removing all occurrences of Item from List.
-*/
+% Alpha and Beta formulas
+components(and(X, Y), X, Y).
+components(neg(and(X, Y)), neg(X), neg(Y)).
+components(or(X, Y), X, Y).
+components(neg(or(X, Y)), neg(X), neg(Y)).
+components(imp(X, Y), neg(X), Y).
+components(neg(imp(X, Y)), X, neg(Y)).
+components(revimp(X, Y), X, neg(Y)).
+components(neg(revimp(X, Y)), neg(X), Y).
+components(uparrow(X, Y), neg(X), neg(Y)).
+components(neg(uparrow(X, Y)), X, Y).
+components(downarrow(X, Y), neg(X), neg(Y)).
+components(neg(downarrow(X, Y)), X, Y).
+components(notimp(X, Y), X, neg(Y)).
+components(neg(notimp(X, Y)), neg(X), Y).
+components(notrevimp(X, Y), neg(X), Y).
+components(neg(notrevimp(X, Y)), X, neg(Y)).
 
-remove(_, [], []).
-remove(X, [X | Tail], Newtail) :- remove(X, Tail, Newtail).
-remove(X, [Head | Tail], [Head | Newtail]) :- not(X=Head), remove(X, Tail, Newtail).
+component(neg(neg(X)), X).
+component(neg(true), false).
+component(neg(false), true).
 
-/** unary(X) :- X is a double negation or a negated constant.
-*/
-
-unary(neg neg _).
-unary(neg true).
-unary(neg false).
-
-# Conjunctive and disjunctive connectives
-conjunctive(_ and _).
-conjunctive(neg(_ or _)).
-conjunctive(neg(_ imp _)).
-conjunctive(neg(_ revimp _)).
-conjunctive(neg(_ uparrow _)).
-conjunctive(_ downarrow _).
-conjunctive(_ notimp _).
-conjunctive(_ notrevimp _).
-
-disjunctive(neg(_ and _)).
-disjunctive(_ or _).
-disjunctive(_ imp _).
-disjunction(_ revimp _).
-disjunctive(_ uparrow _).
-disjunctive(neg(_ downarrow _)).
-disjunctive(neg(_ notimp _)).
-disjunctive(neg(_ notrevimp _)).
-
-#Alpha and Beta formulas
-components(X and Y, X, Y).
-components(neg(X and Y), neg X, neg Y).
-components(X or Y, X, Y).
-components(neg(X or Y), neg X, neg Y).
-components(X imp Y, neg X, Y).
-components(neg(X imp Y), X, neg Y).
-components(X revimp Y, X, neg Y).
-components(neg(X revimp Y), neg X, Y).
-components(X uparrow Y, neg X, neg Y).
-components(neg(X uparrow Y), X, Y).
-components(X downarrow Y, neg X, neg Y).
-components(neg(X downarrow Y), X, Y).
-components(X notimp Y, X, neg Y).
-components(neg(X notimp Y), neg X, Y).
-components(X notrevimp Y, neg X, Y).
-components(neg(X notrevimp Y), X, neg Y).
-
-component(neg neg X, X).
-component(neg true, false).
-component(neg false, true).
-
-#Clause form
+% Clause form
 clauseform(X, Y) :- component(X, X1), clauseform(X1, Y).
-clauseform(X and Y, CNF1) :- clauseform(X, CNF1), clauseform(Y, CNF2), append(CNF1, CNF2, CNF).
-clauseform(X or Y, CNF) :- clauseform(X, CNF1), clauseform(Y, CNF2), findall(Disjunction, (member(A, CNF1), member(B, CNF2), append(A, B, Disjunction)), CNF).
-clauseform(X imp Y, CNF) :- clauseform(or(neg(X), Y), CNF).
-clauseform(X revimp Y, CNF) :- clauseform(or(X, neg(Y)), CNF).
-clauseform(X uparrow Y, CNF) :- clauseform(neg(and(X, Y)), CNF).
-clauseform(X downarrow Y, CNF) :- clauseform(neg(or(X, Y)), CNF).
-clauseform(X notimp Y, CNF) :- clauseform(neg(imp(X, Y)), CNF).
-clauseform(X notrevimp Y, CNF) :- clauseform(neg(revimp(X, Y)), CNF).
-cluseform(X equiv Y, CNF) :- clauseform(and(imp(X, Y), imp(Y, X)), CNF).
-clauseform(X notequiv Y, CNF) :- clauseform(neg(equiv(X, Y)), CNF).
+clauseform(and(X, Y), CNF1) :- clauseform(X, CNF1), clauseform(Y, CNF2), append(CNF1, CNF2, CNF).
+clauseform(or(X, Y), CNF) :- clauseform(X, CNF1), clauseform(Y, CNF2), findall(Disjunction, (member(A, CNF1), member(B, CNF2), append(A, B, Disjunction)), CNF).
+clauseform(imp(X, Y), CNF) :- clauseform(or(neg(X), Y), CNF).
+clauseform(revimp(X, Y), CNF) :- clauseform(or(X, neg(Y)), CNF).
+clauseform(uparrow(X, Y), CNF) :- clauseform(neg(and(X, Y)), CNF).
+clauseform(downarrow(X, Y), CNF) :- clauseform(neg(or(X, Y)), CNF).
+clauseform(notimp(X, Y), CNF) :- clauseform(neg(imp(X, Y)), CNF).
+clauseform(notrevimp(X, Y), CNF) :- clauseform(neg(revimp(X, Y)), CNF).
+cluseform(equiv(X, Y), CNF) :- clauseform(and(imp(X, Y), imp(Y, X)), CNF).
+clauseform(notequiv(X, Y), CNF) :- clauseform(neg(equiv(X, Y)), CNF).
 clauseform(X, [[X]]).
-
-/** singleStep(Old, New) :- New is the result of applying a single step of the expansion to Old, which is a generalized
-conjunction of generalized disjunctions.
-*/
-singleStep([Disjunction | Rest], New) :-
-    member(Formula, Disjunction),
-    unary(Formula),
-    component(Formula, Newformula),
-    remove(Formula, Disjunction, Temporary),
-    Newdisjunction = [Newformula | Temporary],
-    New = [Newdisjunction | Rest].
-
-singleStep([Disjunction | Rest], New) :-
-    member(Beta, Disjunction),
-    disjunctive(Beta),
-    components(Beta, Betaone, Betatwo),
-    remove(Beta, Disjunction, Temporary),
-    Newdis = [Betaone, Betatwo | Temporary],
-    New = [Newdis | Rest].
-
-singleStep([Disjunction | Rest], New) :-
-    member(Alpha, Disjunction),
-    conjunctive(Alpha),
-    components(Alpha, Alphaone, Alphatwo),
-    remove(Alpha, Disjunction, Temporary),
-    Newdisone = [Alphaone | Temporary],
-    Newdistwo = [Alphatwo | Temporary],
-    New = [Newdisone, Newdistwo | Rest].
-
-singleStep([Disjunction | Rest], [Disjunction | Newrest]) :-
-    singleStep(Rest, Newrest).
-
-/** expand(Old, New) :- New is the result of applying singleStep as many times as possible, starting with Old.
-*/
-
-expand(Con, Newcon) :-
-    singleStep(Con, Temp),
-    expand(Temp, Newcon).
-
-expand(Con, Con).
-
-clauseform(X, Y) :- expand([[X]], Y).
-
-/** singleStepDual(Old, New) :- New is the result of applying a single step of the expansion to Old, which is a generalized
-disjunction of generalized conjunctions.
-*/
-
-singleStepDual([Conjunction | Rest], New) :-
-    member(Formula, Conjunction),
-    unary(Formula),
-    component(Formula, Newformula),
-    remove(Formula, Conjunction, Temporary),
-    New = [Newconjunction | Rest],
-    Newconjunction = [Newformula | Temporary].
-
-singleStepDual([Conjunction | Rest], New) :-
-    member(Alpha, Conjunction),
-    conjunctive(Alpha),
-    components(Alpha, Alphaone, Alphatwo),
-    remove(Alpha, Conjunction, Temporary),
-    Newcon = [Alphaone, Alphatwo | Temporary],
-    New = [Newcon | Rest].
-
-singleStepDual([Conjunction | Rest], New) :-
-    member(Beta, Conjunction),
-    disjunctive(Beta),
-    components(Beta, Betaone, Betatwo),
-    remove(Beta, Conjunction, Temporary),
-    Newconone = [Betaone | Temporary],
-    Newcontwo = [Betatwo | Temporary],
-    New = [Newconone, Newcontwo | Rest].
-
-singleStepDual([Conjunction | Rest], [Conjunction | Newrest]) :-
-    singleStepDual(Rest, Newrest).
-
-/** expandDual(Old, New) :- New is the result of applying singleStepDual as many times as possible, starting with Old.
-*/
-
-expandDual(Dis, Newdis) :-
-    singleStepDual(Dis, Temp),
-    expandDual(Temp, Newdis).
-
-expandDual(Dis, Dis).
-
-dualclauseform(X, Y) :- expandDual([[X]], Y).
