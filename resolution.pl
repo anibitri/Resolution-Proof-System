@@ -1,19 +1,47 @@
-?-op(140, fy, neg).
-?-op(160, xfy, [and, or, imp, revimp, uparrow, downarrow, notimp, notrevimp ]).
+:- op(140, fy, neg).
+:- op(160, xfy, [and, or, imp, revimp, uparrow, downarrow, notimp, notrevimp, equiv, notequiv]).
 
-
-
-member(X, [X | _]).
-member(X, [_ | Tail]) :- member(X, Tail).
-
-
+% --- List Utilities ---
+member(X, [X|_]).
+member(X, [_|Tail]) :- member(X, Tail).
 
 remove(_, [], []).
-remove(X, [X | Tail], Newtail) :- remove(X, Tail, Newtail).
-remove(X, [Head | Tail], [Head | Newtail]) :- not(X=Head), remove(X, Tail, Newtail).
+remove(X, [X|Tail], NewTail) :- remove(X, Tail, NewTail).
+remove(X, [Head|Tail], [Head|NewTail]) :- \+ X = Head, remove(X, Tail, NewTail).
 
+% --- Eliminate Equivalences ---
+% This predicate eliminates equivalences and non-equivalences from a formula.
+% It replaces 'equiv' with the conjunction of two implications and 'notequiv' with the disjunction of two negated literals.
+% equiv 'A equiv B' is replaced with '(A imp B) and (B imp A)'.
+% notequiv 'A notequiv B' is replaced with '(A and neg B) or (B and neg A)'.
+% The predicate is recursive and works on the structure of the formula.
+elim_equiv(X, X) :- atomic(X), !.
+elim_equiv(true, true).
+elim_equiv(false, false).
+elim_equiv(neg F, neg F1) :-
+    elim_equiv(F, F1).
+elim_equiv(F1 and F2, E1 and E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 or F2, E1 or E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 imp F2, E1 imp E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 revimp F2, E1 revimp E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 uparrow F2, E1 uparrow E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 downarrow F2, E1 downarrow E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 notimp F2, E1 notimp E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 notrevimp F2, E1 notrevimp E2) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 equiv F2, (E1 imp E2) and (E2 imp E1)) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
+elim_equiv(F1 notequiv F2, ((E1 and neg E2) or (E2 and neg E1))) :-
+    elim_equiv(F1, E1), elim_equiv(F2, E2).
 
-
+% --- Formula Type Tests ---
 conjunctive(_ and _).
 conjunctive(neg(_ or _)).
 conjunctive(neg(_ imp _)).
@@ -22,8 +50,6 @@ conjunctive(neg(_ uparrow _)).
 conjunctive(_ downarrow _).
 conjunctive(_ notimp _).
 conjunctive(_ notrevimp _).
-
-
 
 disjunctive(neg(_ and _)).
 disjunctive(_ or _).
@@ -34,14 +60,16 @@ disjunctive(neg(_ downarrow _)).
 disjunctive(neg(_ notimp _)).
 disjunctive(neg(_ notrevimp _)).
 
+% --- Unary Rewrites (Double Negation, Boolean Constants) ---
+unary(neg(neg(_))).
+unary(neg(true)).
+unary(neg(false)).
 
+component(neg(neg(X)), X).
+component(neg(true), false).
+component(neg(false), true).
 
-unary(neg neg _).
-unary(neg true).
-unary(neg false).
-
-
-
+% --- Binary Component Extraction ---
 components(X and Y, X, Y).
 components(neg(X and Y), neg X, neg Y).
 components(X or Y, X, Y).
@@ -59,102 +87,84 @@ components(neg(X notimp Y), neg X, Y).
 components(X notrevimp Y, neg X, Y).
 components(neg(X notrevimp Y), X, neg Y).
 
-
-
-component(neg neg X, X).
-component(neg true, false).
-component(neg false, true).
-
-
-
-singleStep([Disjunction | Rest], New) :-
+% --- Single-Step Expansion for Clauseform Conversion ---
+singleStep([Disjunction|Rest], New) :-
     member(Formula, Disjunction),
     unary(Formula),
-    component(Formula, Newformula),
+    component(Formula, NewFormula),
     remove(Formula, Disjunction, Temporary),
-    Newdisjunction = [Newformula | Temporary],
-    New = [Newdisjunction | Rest].
+    NewDisjunction = [NewFormula|Temporary],
+    New = [NewDisjunction|Rest].
 
-singleStep([Disjunction | Rest], New) :-
+singleStep([Disjunction|Rest], New) :-
     member(Beta, Disjunction),
     disjunctive(Beta),
-    components(Beta, Betaone, Betatwo),
+    components(Beta, BetaOne, BetaTwo),
     remove(Beta, Disjunction, Temporary),
-    Newdis = [Betaone, Betatwo | Temporary],
-    New = [Newdis | Rest].
+    NewDis = [BetaOne, BetaTwo|Temporary],
+    New = [NewDis|Rest].
 
-singleStep([Disjunction | Rest], New) :-
+singleStep([Disjunction|Rest], New) :-
     member(Alpha, Disjunction),
     conjunctive(Alpha),
-    components(Alpha, Alphaone, Alphatwo),
+    components(Alpha, AlphaOne, AlphaTwo),
     remove(Alpha, Disjunction, Temporary),
-    Newdisone = [Alphaone | Temporary],
-    Newdistwo = [Alphatwo | Temporary],
-    New = [Newdisone, Newdistwo | Rest].
+    NewDisOne = [AlphaOne|Temporary],
+    NewDisTwo = [AlphaTwo|Temporary],
+    New = [NewDisOne, NewDisTwo|Rest].
 
-singleStep([Disjunction | Rest], [Disjunction | Newrest]) :-
-    singleStep(Rest, Newrest).
+singleStep([Disjunction|Rest], [Disjunction|NewRest]) :-
+    singleStep(Rest, NewRest).
 
-
-
-expand(Con, Newcon) :-
-    singleStep(Con, Temp),
-    expand(Temp, Newcon).
-
-expand(Con, Con).
+expand(Con, NewCon) :-
+    (   singleStep(Con, Temp)
+    ->  expand(Temp, NewCon)
+    ;   NewCon = Con
+    ).
 
 clauseform(X, Y) :- expand([[X]], Y).
 
-
-
-singleStepDual([Conjunction | Rest], New) :-
+% --- Dual Clauseform (if needed) ---
+singleStepDual([Conjunction|Rest], New) :-
     member(Formula, Conjunction),
     unary(Formula),
-    component(Formula, Newformula),
+    component(Formula, NewFormula),
     remove(Formula, Conjunction, Temporary),
-    New = [Newconjunction | Rest],
-    Newconjunction = [Newformula | Temporary].
+    NewConjunction = [NewFormula|Temporary],
+    New = [NewConjunction|Rest].
 
-singleStepDual([Conjunction | Rest], New) :-
+singleStepDual([Conjunction|Rest], New) :-
     member(Alpha, Conjunction),
     conjunctive(Alpha),
-    components(Alpha, Alphaone, Alphatwo),
+    components(Alpha, AlphaOne, AlphaTwo),
     remove(Alpha, Conjunction, Temporary),
-    Newcon = [Alphaone, Alphatwo | Temporary],
-    New = [Newcon | Rest].
+    NewCon = [AlphaOne, AlphaTwo|Temporary],
+    New = [NewCon|Rest].
 
-singleStepDual([Conjunction | Rest], New) :-
+singleStepDual([Conjunction|Rest], New) :-
     member(Beta, Conjunction),
     disjunctive(Beta),
-    components(Beta, Betaone, Betatwo),
+    components(Beta, BetaOne, BetaTwo),
     remove(Beta, Conjunction, Temporary),
-    Newconone = [Betaone | Temporary],
-    Newcontwo = [Betatwo | Temporary],
-    New = [Newconone, Newcontwo | Rest].
+    NewConOne = [BetaOne|Temporary],
+    NewConTwo = [BetaTwo|Temporary],
+    New = [NewConOne, NewConTwo|Rest].
 
-singleStepDual([Conjunction | Rest], [Conjunction | Newrest]) :-
-    singleStepDual(Rest, Newrest).
+singleStepDual([Conjunction|Rest], [Conjunction|NewRest]) :-
+    singleStepDual(Rest, NewRest).
 
-
-
-expandDual(Dis, Newdis) :-
-    singleStepDual(Dis, Temp),
-    expandDual(Temp, Newdis).
-
-expandDual(Dis, Dis).
+expandDual(Dis, NewDis) :-
+    (   singleStepDual(Dis, Temp)
+    ->  expandDual(Temp, NewDis)
+    ;   NewDis = Dis
+    ).
 
 dualclauseform(X, Y) :- expandDual([[X]], Y).
 
-% Equivalence connectives
-equiv(X,Y) :- X = Y.
-notequiv(X,Y) :- \+ equiv(X,Y).
+% --- Resolution Rule Implementation ---
+complement(neg(X), X) :- !.
+complement(X, neg(X)) :- atomic(X).
 
-
-
-% In this new version we use the clauseform predicate from normalForm.pl.
-% It converts a formula into its clausal form.
-
-% Resolution rule implementation
 resolve(C1, C2, Resolvent) :-
     member(Lit, C1),
     complement(Lit, CompLit),
@@ -164,11 +174,6 @@ resolve(C1, C2, Resolvent) :-
     append(R1, R2, Temp),
     sort(Temp, Resolvent).
 
-% Complement of a literal
-complement(neg(X), X) :- !.
-complement(X, neg(X)) :- atomic(X).
-
-% Resolution loop
 resolution(ClauseSet, NewClauseSet) :-
     findall(Resolvent,
         ( member(C1, ClauseSet),
@@ -186,20 +191,23 @@ resolution(ClauseSet, NewClauseSet) :-
     ).
 resolution(ClauseSet, ClauseSet).
 
-% Helper to combine multiple premises with AND
-and_list([], true).  % Base case: no premises means "true"
-and_list([F], F).    
+% --- Combining Premises ---
+and_list([], true).  % no premises => true
+and_list([F], F).
 and_list([F|Fs], and(F, Rest)) :-
     and_list(Fs, Rest).
 
-% Test predicate - invoked from check.py
+% --- Test Predicate ---
+% test(Premises, Consequence) prints 'YES' if Consequence is a logical consequence of Premises, and 'NO' otherwise.
 test(Premises, Consequence) :-
-    and_list(Premises, PremisesConj),
-    Overall = and(PremisesConj, neg(Consequence)),
+    % First, eliminate equiv and notequiv from premises and consequence.
+    maplist(elim_equiv, Premises, PremisesNoEquiv),
+    elim_equiv(neg(Consequence), NegConseq),
+    and_list(PremisesNoEquiv, PremisesConj),
+    Overall = and(PremisesConj, NegConseq),
     clauseform(Overall, CNF),
     resolution(CNF, Result),
     ( member([], Result) ->
           write('YES'), nl
       ; write('NO'), nl
     ).
-
