@@ -1,7 +1,19 @@
+/*
+    YES
+    YES
+    YES
+    NO
+    YES
+    YES
+    YES
+    NO
+    NO
+    YES
+*/
+
 :- op(140, fy, neg).
 :- op(160, xfy, [and, or, imp, revimp, uparrow, downarrow, notimp, notrevimp, equiv, notequiv]).
 
-% --- List Utilities ---
 member(X, [X|_]).
 member(X, [_|Tail]) :- member(X, Tail).
 
@@ -9,12 +21,16 @@ remove(_, [], []).
 remove(X, [X|Tail], NewTail) :- remove(X, Tail, NewTail).
 remove(X, [Head|Tail], [Head|NewTail]) :- \+ X = Head, remove(X, Tail, NewTail).
 
-% --- Eliminate Equivalences ---
-% This predicate eliminates equivalences and non-equivalences from a formula.
-% It replaces 'equiv' with the conjunction of two implications and 'notequiv' with the disjunction of two negated literals.
-% equiv 'A equiv B' is replaced with '(A imp B) and (B imp A)'.
-% notequiv 'A notequiv B' is replaced with '(A and neg B) or (B and neg A)'.
-% The predicate is recursive and works on the structure of the formula.
+/*
+    ELIMINATE EQUIVALENCES
+
+    elim_equiv(+Formula, -NewFormula)
+    This predicate eliminates equivalences and non-equivalences from a formula.
+    It replaces 'equiv' with the conjunction of two implications and 'notequiv' with the disjunction of two negated literals.
+    equiv 'A equiv B' is replaced with '(A imp B) and (B imp A)'.
+    notequiv 'A notequiv B' is replaced with '(A and neg B) or (B and neg A)'.
+    The predicate is recursive and works on the structure of the formula.
+*/
 elim_equiv(X, X) :- atomic(X), !.
 elim_equiv(true, true).
 elim_equiv(false, false).
@@ -41,7 +57,7 @@ elim_equiv(F1 equiv F2, (E1 imp E2) and (E2 imp E1)) :-
 elim_equiv(F1 notequiv F2, ((E1 and neg E2) or (E2 and neg E1))) :-
     elim_equiv(F1, E1), elim_equiv(F2, E2).
 
-% --- Formula Type Tests ---
+% Conjunctive and Disjunctive Definitions
 conjunctive(_ and _).
 conjunctive(neg(_ or _)).
 conjunctive(neg(_ imp _)).
@@ -60,7 +76,7 @@ disjunctive(neg(_ downarrow _)).
 disjunctive(neg(_ notimp _)).
 disjunctive(neg(_ notrevimp _)).
 
-% --- Unary Rewrites (Double Negation, Boolean Constants) ---
+% Unary Definitions
 unary(neg(neg(_))).
 unary(neg(true)).
 unary(neg(false)).
@@ -69,7 +85,7 @@ component(neg(neg(X)), X).
 component(neg(true), false).
 component(neg(false), true).
 
-% --- Binary Component Extraction ---
+% Break down complex formulas into components
 components(X and Y, X, Y).
 components(neg(X and Y), neg X, neg Y).
 components(X or Y, X, Y).
@@ -87,7 +103,7 @@ components(neg(X notimp Y), neg X, Y).
 components(X notrevimp Y, neg X, Y).
 components(neg(X notrevimp Y), X, neg Y).
 
-% --- Single-Step Expansion for Clauseform Conversion ---
+% Single-Step Expansion for Clauseform Conversion
 singleStep([Disjunction|Rest], New) :-
     member(Formula, Disjunction),
     unary(Formula),
@@ -124,7 +140,7 @@ expand(Con, NewCon) :-
 
 clauseform(X, Y) :- expand([[X]], Y).
 
-% --- Dual Clauseform (if needed) ---
+% Dual Clauseform
 singleStepDual([Conjunction|Rest], New) :-
     member(Formula, Conjunction),
     unary(Formula),
@@ -161,7 +177,7 @@ expandDual(Dis, NewDis) :-
 
 dualclauseform(X, Y) :- expandDual([[X]], Y).
 
-% --- Resolution Rule Implementation ---
+% Resolution Rules
 complement(neg(X), X) :- !.
 complement(X, neg(X)) :- atomic(X).
 
@@ -191,13 +207,13 @@ resolution(ClauseSet, NewClauseSet) :-
     ).
 resolution(ClauseSet, ClauseSet).
 
-% --- Combining Premises ---
+% Combining Premises 
 and_list([], true).  % no premises => true
 and_list([F], F).
 and_list([F|Fs], and(F, Rest)) :-
     and_list(Fs, Rest).
 
-% --- Test Predicate ---
+% Test Predicate
 % test(Premises, Consequence) prints 'YES' if Consequence is a logical consequence of Premises, and 'NO' otherwise.
 test(Premises, Consequence) :-
     % First, eliminate equiv and notequiv from premises and consequence.
